@@ -1,0 +1,228 @@
+{
+  "best_model_name": "Gradient Boosting",
+  "validation_f1": 0.8749999999999999,
+  "validation_pr_auc": 0.9288393720122294,
+  "test_metrics": {
+    "accuracy": 0.9946666666666667,
+    "balanced_accuracy": 0.9215686274509804,
+    "precision": 1.0,
+    "recall": 0.8431372549019608,
+    "f1": 0.9148936170212766,
+    "roc_auc": 0.9727871825058525,
+    "pr_auc": 0.9160049670724956,
+    "specificity": 1.0,
+    "fpr": 0.0,
+    "fnr": 0.1568627450980392,
+    "confusion_matrix": {
+      "tn": 1449,
+      "fp": 0,
+      "fn": 8,
+      "tp": 43
+    },
+    "support": {
+      "total": 1500,
+      "positive_failures": 51,
+      "negative_normal": 1449
+    }
+  },
+  "all_models_test_results": {
+    "Random Forest (Balanced)": {
+      "accuracy": 0.9913333333333333,
+      "balanced_accuracy": 0.8914667316201843,
+      "precision": 0.9523809523809523,
+      "recall": 0.7843137254901961,
+      "f1": 0.8602150537634408,
+      "roc_auc": 0.9768806073153898,
+      "pr_auc": 0.9031065173812509,
+      "specificity": 0.9986197377501725,
+      "fpr": 0.0013802622498274672,
+      "fnr": 0.21568627450980393,
+      "confusion_matrix": {
+        "tn": 1447,
+        "fp": 2,
+        "fn": 11,
+        "tp": 40
+      },
+      "support": {
+        "total": 1500,
+        "positive_failures": 51,
+        "negative_normal": 1449
+      }
+    },
+    "Gradient Boosting": {
+      "accuracy": 0.9946666666666667,
+      "balanced_accuracy": 0.9215686274509804,
+      "precision": 1.0,
+      "recall": 0.8431372549019608,
+      "f1": 0.9148936170212766,
+      "roc_auc": 0.9727871825058525,
+      "pr_auc": 0.9160049670724956,
+      "specificity": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.1568627450980392,
+      "confusion_matrix": {
+        "tn": 1449,
+        "fp": 0,
+        "fn": 8,
+        "tp": 43
+      },
+      "support": {
+        "total": 1500,
+        "positive_failures": 51,
+        "negative_normal": 1449
+      }
+    },
+    "HistGradientBoosting": {
+      "accuracy": 0.9906666666666667,
+      "balanced_accuracy": 0.900580522063898,
+      "precision": 0.9111111111111111,
+      "recall": 0.803921568627451,
+      "f1": 0.8541666666666666,
+      "roc_auc": 0.9769956291695423,
+      "pr_auc": 0.8877694943202423,
+      "specificity": 0.9972394755003451,
+      "fpr": 0.0027605244996549345,
+      "fnr": 0.19607843137254902,
+      "confusion_matrix": {
+        "tn": 1445,
+        "fp": 4,
+        "fn": 10,
+        "tp": 41
+      },
+      "support": {
+        "total": 1500,
+        "positive_failures": 51,
+        "negative_normal": 1449
+      }
+    },
+    "Logistic Regression (Balanced)": {
+      "accuracy": 0.862,
+      "balanced_accuracy": 0.8623594365282345,
+      "precision": 0.18032786885245902,
+      "recall": 0.8627450980392157,
+      "f1": 0.2983050847457627,
+      "roc_auc": 0.9371710036671673,
+      "pr_auc": 0.4430650065586792,
+      "specificity": 0.8619737750172533,
+      "fpr": 0.13802622498274672,
+      "fnr": 0.13725490196078433,
+      "confusion_matrix": {
+        "tn": 1249,
+        "fp": 200,
+        "fn": 7,
+        "tp": 44
+      },
+      "support": {
+        "total": 1500,
+        "positive_failures": 51,
+        "negative_normal": 1449
+      }
+    }
+  },
+  "global_shap_importance": {
+    "Power [kW]": 12655.594737723335,
+    "Process temperature [K]": 12077.26973939433,
+    "Tool wear [min]": 0.6266300776454709,
+    "Rotational speed [rpm]": 0.5191774364764971,
+    "Temp difference [K]": 0.3658016025056506,
+    "Wear torque product [min*Nm]": 0.23490940377577138,
+    "Torque [Nm]": 0.18028394187705113,
+    "Air temperature [K]": 0.14341874193270235,
+    "Type_L": 0.03630349535435749,
+    "Type_M": 0.010381476663610112,
+    "Type_H": 0.008880917379803356
+  },
+  "representative_sample_xai_comparison": {
+    "predicted_prob": 0.9916478732700947,
+    "predicted_class": 1,
+    "spearman_rank_corr": 0.2091,
+    "top_5_jaccard": 0.4286,
+    "cosine_similarity": 0.2387
+  },
+  "perturbation_stability_summary": {
+    "0.01": {
+      "SHAP": {
+        "mean_spearman": 0.9848,
+        "std_spearman": 0.0393,
+        "mean_top3_jaccard": 0.9625,
+        "std_top3_jaccard": 0.1317,
+        "mean_cosine_sim": 0.9777,
+        "std_cosine_sim": 0.1395,
+        "mean_l1_shift": 0.0002
+      },
+      "LIME": {
+        "mean_spearman": 0.323,
+        "std_spearman": 0.2897,
+        "mean_top3_jaccard": 0.3925,
+        "std_top3_jaccard": 0.1954,
+        "mean_cosine_sim": 0.5811,
+        "std_cosine_sim": 0.2748,
+        "mean_l1_shift": 0.0562
+      }
+    },
+    "0.05": {
+      "SHAP": {
+        "mean_spearman": 0.9598,
+        "std_spearman": 0.0514,
+        "mean_top3_jaccard": 0.9125,
+        "std_top3_jaccard": 0.19,
+        "mean_cosine_sim": 0.9107,
+        "std_cosine_sim": 0.2679,
+        "mean_l1_shift": 0.001
+      },
+      "LIME": {
+        "mean_spearman": 0.362,
+        "std_spearman": 0.326,
+        "mean_top3_jaccard": 0.4075,
+        "std_top3_jaccard": 0.2814,
+        "mean_cosine_sim": 0.5784,
+        "std_cosine_sim": 0.2688,
+        "mean_l1_shift": 0.0547
+      }
+    },
+    "0.1": {
+      "SHAP": {
+        "mean_spearman": 0.9291,
+        "std_spearman": 0.0859,
+        "mean_top3_jaccard": 0.8125,
+        "std_top3_jaccard": 0.2421,
+        "mean_cosine_sim": 0.8438,
+        "std_cosine_sim": 0.3392,
+        "mean_l1_shift": 0.0017
+      },
+      "LIME": {
+        "mean_spearman": 0.2484,
+        "std_spearman": 0.2813,
+        "mean_top3_jaccard": 0.3725,
+        "std_top3_jaccard": 0.2588,
+        "mean_cosine_sim": 0.5374,
+        "std_cosine_sim": 0.3259,
+        "mean_l1_shift": 0.0583
+      }
+    },
+    "0.2": {
+      "SHAP": {
+        "mean_spearman": 0.912,
+        "std_spearman": 0.0761,
+        "mean_top3_jaccard": 0.8,
+        "std_top3_jaccard": 0.2449,
+        "mean_cosine_sim": 0.7098,
+        "std_cosine_sim": 0.4183,
+        "mean_l1_shift": 0.0032
+      },
+      "LIME": {
+        "mean_spearman": 0.1809,
+        "std_spearman": 0.3559,
+        "mean_top3_jaccard": 0.3175,
+        "std_top3_jaccard": 0.2155,
+        "mean_cosine_sim": 0.4299,
+        "std_cosine_sim": 0.3082,
+        "mean_l1_shift": 0.0649
+      }
+    }
+  },
+  "lime_seed_stochasticity": {
+    "overall_mean_correlation": 0.4041,
+    "overall_std_correlation": 0.1716
+  }
+}
