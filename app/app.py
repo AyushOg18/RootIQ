@@ -155,15 +155,23 @@ def main():
     test_results = model_artifact.get("test_results", {})
     feature_names = preprocessor.feature_names_
 
-    # Default initial machine state in session_state if not already present
+    # ── Global Persistent Machine State Initialization ──────────────────────
+    if "sim_type" not in st.session_state:
+        st.session_state["sim_type"] = "M"
+        st.session_state["sim_air_temp"] = 300.0
+        st.session_state["sim_proc_temp"] = 310.0
+        st.session_state["sim_speed"] = 1500.0
+        st.session_state["sim_torque"] = 40.0
+        st.session_state["sim_wear"] = 50.0
+
     if "current_raw_instance" not in st.session_state:
         init_raw = {
-            "Type": "M",
-            "Air temperature [K]": 300.0,
-            "Process temperature [K]": 310.0,
-            "Rotational speed [rpm]": 1500.0,
-            "Torque [Nm]": 40.0,
-            "Tool wear [min]": 50.0
+            "Type": st.session_state["sim_type"],
+            "Air temperature [K]": float(st.session_state["sim_air_temp"]),
+            "Process temperature [K]": float(st.session_state["sim_proc_temp"]),
+            "Rotational speed [rpm]": float(st.session_state["sim_speed"]),
+            "Torque [Nm]": float(st.session_state["sim_torque"]),
+            "Tool wear [min]": float(st.session_state["sim_wear"])
         }
         init_scaled = preprocessor.transform(pd.DataFrame([init_raw]))
         st.session_state["current_raw_instance"] = init_raw
@@ -325,11 +333,16 @@ def main():
             st.session_state["sim_speed"] = 1500.0
             st.session_state["sim_torque"] = 40.0
             st.session_state["sim_wear"] = 50.0
-            st.session_state["current_preset"] = "Custom User Configuration"
 
-        # Preset definitions
+        preset_options = [
+            "— Select Preset (Optional) —",
+            "Scenario A: Stable Nominal Milling",
+            "Scenario B: Heat Dissipation Overload (HDF)",
+            "Scenario C: Critical Tool Wear & Overstrain (OSF)",
+            "Scenario D: High-Power Spindle Jam (PWF)"
+        ]
+
         preset_configs = {
-            "Custom User Configuration": None,
             "Scenario A: Stable Nominal Milling": {
                 "Type": "M", "Air temperature [K]": 298.5, "Process temperature [K]": 308.7,
                 "Rotational speed [rpm]": 1550.0, "Torque [Nm]": 38.0, "Tool wear [min]": 25.0
@@ -348,81 +361,88 @@ def main():
             }
         }
 
-        def on_preset_change():
-            chosen = st.session_state.get("preset_selector")
-            cfg = preset_configs.get(chosen)
-            if cfg:
+        col_presets, col_reset = st.columns([4, 1])
+        with col_presets:
+            selected_preset = st.selectbox(
+                "Load Industrial Scenario Preset:",
+                preset_options,
+                index=0
+            )
+            # If user picks an active preset from dropdown, apply its values
+            if selected_preset in preset_configs:
+                cfg = preset_configs[selected_preset]
                 st.session_state["sim_type"] = cfg["Type"]
                 st.session_state["sim_air_temp"] = float(cfg["Air temperature [K]"])
                 st.session_state["sim_proc_temp"] = float(cfg["Process temperature [K]"])
                 st.session_state["sim_speed"] = float(cfg["Rotational speed [rpm]"])
                 st.session_state["sim_torque"] = float(cfg["Torque [Nm]"])
                 st.session_state["sim_wear"] = float(cfg["Tool wear [min]"])
-            st.session_state["current_preset"] = chosen
 
-        def on_reset():
-            st.session_state["sim_type"] = "M"
-            st.session_state["sim_air_temp"] = 300.0
-            st.session_state["sim_proc_temp"] = 310.0
-            st.session_state["sim_speed"] = 1500.0
-            st.session_state["sim_torque"] = 40.0
-            st.session_state["sim_wear"] = 50.0
-            st.session_state["preset_selector"] = "Custom User Configuration"
-            st.session_state["current_preset"] = "Custom User Configuration"
-
-        col_presets, col_reset = st.columns([4, 1])
-        with col_presets:
-            st.selectbox(
-                "Load Industrial Scenario Preset:",
-                list(preset_configs.keys()),
-                key="preset_selector",
-                on_change=on_preset_change
-            )
         with col_reset:
-            st.button("Reset Defaults", on_click=on_reset)
+            if st.button("Reset Defaults"):
+                st.session_state["sim_type"] = "M"
+                st.session_state["sim_air_temp"] = 300.0
+                st.session_state["sim_proc_temp"] = 310.0
+                st.session_state["sim_speed"] = 1500.0
+                st.session_state["sim_torque"] = 40.0
+                st.session_state["sim_wear"] = 50.0
+                st.experimental_rerun()
 
         st.markdown("### ⚙️ Operating Parameter Controls")
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown("**Thermal Parameters**")
+            type_options = ["L", "M", "H"]
+            cur_type = st.session_state.get("sim_type", "M")
+            type_idx = type_options.index(cur_type) if cur_type in type_options else 1
             val_type = st.selectbox(
                 "Product Quality Type",
-                ["L", "M", "H"],
-                key="sim_type"
+                type_options,
+                index=type_idx
             )
+            st.session_state["sim_type"] = val_type
+
             val_air_temp = st.slider(
                 "Air Temperature [K]",
                 290.0, 310.0,
-                key="sim_air_temp",
+                value=float(st.session_state.get("sim_air_temp", 300.0)),
                 step=0.1
             )
+            st.session_state["sim_air_temp"] = val_air_temp
+
             val_proc_temp = st.slider(
                 "Process Temperature [K]",
                 300.0, 320.0,
-                key="sim_proc_temp",
+                value=float(st.session_state.get("sim_proc_temp", 310.0)),
                 step=0.1
             )
+            st.session_state["sim_proc_temp"] = val_proc_temp
 
         with c2:
             st.markdown("**Mechanical Parameters**")
             val_speed = st.slider(
                 "Rotational Speed [rpm]",
                 1100.0, 2900.0,
-                key="sim_speed",
+                value=float(st.session_state.get("sim_speed", 1500.0)),
                 step=10.0
             )
+            st.session_state["sim_speed"] = val_speed
+
             val_torque = st.slider(
                 "Torque [Nm]",
                 3.0, 80.0,
-                key="sim_torque",
+                value=float(st.session_state.get("sim_torque", 40.0)),
                 step=0.5
             )
+            st.session_state["sim_torque"] = val_torque
+
             val_wear = st.slider(
                 "Tool Wear [min]",
                 0.0, 260.0,
-                key="sim_wear",
+                value=float(st.session_state.get("sim_wear", 50.0)),
                 step=1.0
             )
+            st.session_state["sim_wear"] = val_wear
 
         with c3:
             st.markdown("**📐 Derived Physical Indicators**")
