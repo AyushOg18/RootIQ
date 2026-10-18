@@ -155,6 +155,21 @@ def main():
     test_results = model_artifact.get("test_results", {})
     feature_names = preprocessor.feature_names_
 
+    # Default initial machine state in session_state if not already present
+    if "current_raw_instance" not in st.session_state:
+        init_raw = {
+            "Type": "M",
+            "Air temperature [K]": 300.0,
+            "Process temperature [K]": 310.0,
+            "Rotational speed [rpm]": 1500.0,
+            "Torque [Nm]": 40.0,
+            "Tool wear [min]": 50.0
+        }
+        init_scaled = preprocessor.transform(pd.DataFrame([init_raw]))
+        st.session_state["current_raw_instance"] = init_raw
+        st.session_state["current_scaled_instance"] = init_scaled[0]
+        st.session_state["current_prob"] = float(best_model.predict_proba(init_scaled)[0, 1])
+
     # -------------------------------------------------------------------------
     # PAGE 1: EXECUTIVE OVERVIEW
     # -------------------------------------------------------------------------
@@ -302,62 +317,112 @@ def main():
         st.markdown("<h2 class='main-header'>Machine Operating Parameter Simulator</h2>", unsafe_allow_html=True)
         st.markdown("<p class='sub-header'>Configure real-time sensor parameters below. Your settings are saved — navigate to Page 5 to see the failure prediction.</p>", unsafe_allow_html=True)
 
-        # Preset scenarios
+        # Initialize persistent simulator state if not present
+        if "sim_type" not in st.session_state:
+            st.session_state["sim_type"] = "M"
+            st.session_state["sim_air_temp"] = 300.0
+            st.session_state["sim_proc_temp"] = 310.0
+            st.session_state["sim_speed"] = 1500.0
+            st.session_state["sim_torque"] = 40.0
+            st.session_state["sim_wear"] = 50.0
+            st.session_state["current_preset"] = "Custom User Configuration"
+
+        # Preset definitions
+        preset_configs = {
+            "Custom User Configuration": None,
+            "Scenario A: Stable Nominal Milling": {
+                "Type": "M", "Air temperature [K]": 298.5, "Process temperature [K]": 308.7,
+                "Rotational speed [rpm]": 1550.0, "Torque [Nm]": 38.0, "Tool wear [min]": 25.0
+            },
+            "Scenario B: Heat Dissipation Overload (HDF)": {
+                "Type": "L", "Air temperature [K]": 303.8, "Process temperature [K]": 313.2,
+                "Rotational speed [rpm]": 1280.0, "Torque [Nm]": 62.0, "Tool wear [min]": 185.0
+            },
+            "Scenario C: Critical Tool Wear & Overstrain (OSF)": {
+                "Type": "L", "Air temperature [K]": 299.5, "Process temperature [K]": 309.2,
+                "Rotational speed [rpm]": 1360.0, "Torque [Nm]": 65.0, "Tool wear [min]": 218.0
+            },
+            "Scenario D: High-Power Spindle Jam (PWF)": {
+                "Type": "H", "Air temperature [K]": 300.0, "Process temperature [K]": 310.5,
+                "Rotational speed [rpm]": 2750.0, "Torque [Nm]": 68.0, "Tool wear [min]": 110.0
+            }
+        }
+
+        def on_preset_change():
+            chosen = st.session_state.get("preset_selector")
+            cfg = preset_configs.get(chosen)
+            if cfg:
+                st.session_state["sim_type"] = cfg["Type"]
+                st.session_state["sim_air_temp"] = float(cfg["Air temperature [K]"])
+                st.session_state["sim_proc_temp"] = float(cfg["Process temperature [K]"])
+                st.session_state["sim_speed"] = float(cfg["Rotational speed [rpm]"])
+                st.session_state["sim_torque"] = float(cfg["Torque [Nm]"])
+                st.session_state["sim_wear"] = float(cfg["Tool wear [min]"])
+            st.session_state["current_preset"] = chosen
+
+        def on_reset():
+            st.session_state["sim_type"] = "M"
+            st.session_state["sim_air_temp"] = 300.0
+            st.session_state["sim_proc_temp"] = 310.0
+            st.session_state["sim_speed"] = 1500.0
+            st.session_state["sim_torque"] = 40.0
+            st.session_state["sim_wear"] = 50.0
+            st.session_state["preset_selector"] = "Custom User Configuration"
+            st.session_state["current_preset"] = "Custom User Configuration"
+
         col_presets, col_reset = st.columns([4, 1])
         with col_presets:
-            preset = st.selectbox(
+            st.selectbox(
                 "Load Industrial Scenario Preset:",
-                ["Custom User Configuration",
-                 "Scenario A: Stable Nominal Milling",
-                 "Scenario B: Heat Dissipation Overload (HDF)",
-                 "Scenario C: Critical Tool Wear & Overstrain (OSF)",
-                 "Scenario D: High-Power Spindle Jam (PWF)"]
+                list(preset_configs.keys()),
+                key="preset_selector",
+                on_change=on_preset_change
             )
         with col_reset:
-            if st.button("Reset Defaults"):
-                preset = "Custom User Configuration"
-
-        # Defaults based on preset
-        defaults = {
-            "Type": "M",
-            "Air temperature [K]": 300.0,
-            "Process temperature [K]": 310.0,
-            "Rotational speed [rpm]": 1500.0,
-            "Torque [Nm]": 40.0,
-            "Tool wear [min]": 50.0
-        }
-        if preset == "Scenario A: Stable Nominal Milling":
-            defaults = {"Type": "M", "Air temperature [K]": 298.5, "Process temperature [K]": 308.7,
-                        "Rotational speed [rpm]": 1550.0, "Torque [Nm]": 38.0, "Tool wear [min]": 25.0}
-        elif preset == "Scenario B: Heat Dissipation Overload (HDF)":
-            defaults = {"Type": "L", "Air temperature [K]": 303.8, "Process temperature [K]": 313.2,
-                        "Rotational speed [rpm]": 1280.0, "Torque [Nm]": 62.0, "Tool wear [min]": 185.0}
-        elif preset == "Scenario C: Critical Tool Wear & Overstrain (OSF)":
-            defaults = {"Type": "L", "Air temperature [K]": 299.5, "Process temperature [K]": 309.2,
-                        "Rotational speed [rpm]": 1360.0, "Torque [Nm]": 65.0, "Tool wear [min]": 218.0}
-        elif preset == "Scenario D: High-Power Spindle Jam (PWF)":
-            defaults = {"Type": "H", "Air temperature [K]": 300.0, "Process temperature [K]": 310.5,
-                        "Rotational speed [rpm]": 2750.0, "Torque [Nm]": 68.0, "Tool wear [min]": 110.0}
+            st.button("Reset Defaults", on_click=on_reset)
 
         st.markdown("### ⚙️ Operating Parameter Controls")
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown("**Thermal Parameters**")
-            val_type = st.selectbox("Product Quality Type", ["L", "M", "H"],
-                                    index=["L", "M", "H"].index(defaults["Type"]))
-            val_air_temp = st.slider("Air Temperature [K]", 290.0, 310.0,
-                                     float(defaults["Air temperature [K]"]), step=0.1)
-            val_proc_temp = st.slider("Process Temperature [K]", 300.0, 320.0,
-                                      float(defaults["Process temperature [K]"]), step=0.1)
+            val_type = st.selectbox(
+                "Product Quality Type",
+                ["L", "M", "H"],
+                key="sim_type"
+            )
+            val_air_temp = st.slider(
+                "Air Temperature [K]",
+                290.0, 310.0,
+                key="sim_air_temp",
+                step=0.1
+            )
+            val_proc_temp = st.slider(
+                "Process Temperature [K]",
+                300.0, 320.0,
+                key="sim_proc_temp",
+                step=0.1
+            )
 
         with c2:
             st.markdown("**Mechanical Parameters**")
-            val_speed = st.slider("Rotational Speed [rpm]", 1100.0, 2900.0,
-                                  float(defaults["Rotational speed [rpm]"]), step=10.0)
-            val_torque = st.slider("Torque [Nm]", 3.0, 80.0,
-                                   float(defaults["Torque [Nm]"]), step=0.5)
-            val_wear = st.slider("Tool Wear [min]", 0.0, 260.0,
-                                 float(defaults["Tool wear [min]"]), step=1.0)
+            val_speed = st.slider(
+                "Rotational Speed [rpm]",
+                1100.0, 2900.0,
+                key="sim_speed",
+                step=10.0
+            )
+            val_torque = st.slider(
+                "Torque [Nm]",
+                3.0, 80.0,
+                key="sim_torque",
+                step=0.5
+            )
+            val_wear = st.slider(
+                "Tool Wear [min]",
+                0.0, 260.0,
+                key="sim_wear",
+                step=1.0
+            )
 
         with c3:
             st.markdown("**📐 Derived Physical Indicators**")
@@ -376,14 +441,14 @@ def main():
                       delta="Critical" if strain > 10000 else "Normal",
                       delta_color="inverse" if strain > 10000 else "normal")
 
-        # Save to session state
+        # Save to session state for explanation & inference pages
         raw_instance = {
             "Type": val_type,
-            "Air temperature [K]": val_air_temp,
-            "Process temperature [K]": val_proc_temp,
-            "Rotational speed [rpm]": val_speed,
-            "Torque [Nm]": val_torque,
-            "Tool wear [min]": val_wear
+            "Air temperature [K]": float(val_air_temp),
+            "Process temperature [K]": float(val_proc_temp),
+            "Rotational speed [rpm]": float(val_speed),
+            "Torque [Nm]": float(val_torque),
+            "Tool wear [min]": float(val_wear)
         }
         instance_df = pd.DataFrame([raw_instance])
         instance_scaled = preprocessor.transform(instance_df)
@@ -394,7 +459,7 @@ def main():
         st.session_state["current_prob"] = prob
 
         st.markdown("---")
-        st.info("✅ Parameters saved. Navigate to **Page 5 → Failure Probability & Decision** to see the model prediction, or **Page 6/7** for SHAP/LIME explanations.")
+        st.info("✅ Parameters saved in real-time. Navigate to **Page 5 → Failure Probability & Decision** or **Page 6/7/8** for SHAP & LIME explanations.")
 
         st.markdown("### 📋 Current Parameter Summary")
         summary_df = pd.DataFrame([{
