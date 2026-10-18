@@ -57,18 +57,59 @@ def get_cached_raw_data():
     return load_raw_data(RAW_DATA_PATH)
 
 
+def _train_pipeline_from_scratch():
+    """Train the full pipeline from raw data. Used when joblib artifacts
+    cannot be loaded (e.g. cross-Python-version pickle incompatibility on cloud)."""
+    from src.models import ModelTrainer, evaluate_model
+    import numpy as np
+
+    df = load_raw_data(RAW_DATA_PATH)
+    preprocessor = RootIQPreprocessor(include_engineered_features=True)
+    X_train, X_val, X_test, y_train, y_val, y_test = preprocessor.clean_and_split_data(df)
+
+    X_train_s = preprocessor.fit_transform(X_train)
+    X_val_s   = preprocessor.transform(X_val)
+    X_test_s  = preprocessor.transform(X_test)
+
+    trainer = ModelTrainer(random_state=RANDOM_SEED)
+    best_name = trainer.train_and_validate(X_train_s, y_train, X_val_s, y_val, selection_metric="f1")
+
+    test_results = {}
+    for name, model in trainer.models.items():
+        test_results[name] = evaluate_model(model, X_test_s, y_test)
+
+    trainer.save_best_model()
+    preprocessor.save()
+
+    # Save processed splits
+    np.save(DATA_PROCESSED_DIR / "X_train_scaled.npy", X_train_s)
+    np.save(DATA_PROCESSED_DIR / "X_val_scaled.npy",   X_val_s)
+    np.save(DATA_PROCESSED_DIR / "X_test_scaled.npy",  X_test_s)
+
+    model_artifact = ModelTrainer.load_model_artifact(MODELS_DIR / "best_model.joblib")
+    return model_artifact, preprocessor
+
+
 @st.cache_resource
 def get_cached_model_and_preprocessor():
-    """Load model artifact and fitted preprocessor."""
+    """Load model artifact and fitted preprocessor.
+    Falls back to retraining if joblib files are missing or
+    incompatible (e.g. pickled on a different Python version).
+    """
     model_path = MODELS_DIR / "best_model.joblib"
-    prep_path = MODELS_DIR / "preprocessor.joblib"
-    
-    if not model_path.exists() or not prep_path.exists():
-        return None, None
-        
-    model_artifact = ModelTrainer.load_model_artifact(model_path)
-    preprocessor = RootIQPreprocessor.load(prep_path)
-    return model_artifact, preprocessor
+    prep_path  = MODELS_DIR / "preprocessor.joblib"
+
+    if model_path.exists() and prep_path.exists():
+        try:
+            model_artifact = ModelTrainer.load_model_artifact(model_path)
+            preprocessor   = RootIQPreprocessor.load(prep_path)
+            return model_artifact, preprocessor
+        except Exception:
+            # Cross-Python-version pickle error — retrain from scratch
+            pass
+
+    # Artifacts missing or unloadable — train now
+    return _train_pipeline_from_scratch()
 
 
 def main():
@@ -77,7 +118,7 @@ def main():
     # Sidebar Navigation
     st.sidebar.title("RootIQ Platform")
     st.sidebar.markdown("**Explainable Root Cause Analysis**")
-    
+
     pages = [
         "1. Executive Overview",
         "2. Dataset Exploration & Quality",
@@ -90,9 +131,9 @@ def main():
         "9. Explanation-Stability Lab",
         "10. Research Findings & Reports"
     ]
-    
+
     selected_page = st.sidebar.radio("Navigate Module:", pages)
-    
+
     st.sidebar.markdown("---")
     st.sidebar.info(
         "**System Notice:** Machine predictions and explanations highlight diagnostic correlations "
@@ -100,17 +141,16 @@ def main():
     )
 
     df_raw = get_cached_raw_data()
-    model_artifact, preprocessor = get_cached_model_and_preprocessor()
 
-    # Check if pipeline needs execution first
-    if df_raw is None or model_artifact is None:
-        st.warning("Model and dataset artifacts not yet compiled. Run the research pipeline script first or click below.")
-        if st.button("Run Research Pipeline Now"):
-            with st.spinner("Training models, generating SHAP/LIME explainers, and measuring stability..."):
-                from experiments.run_pipeline import run_full_pipeline
-                run_full_pipeline()
-                st.success("Pipeline execution complete! Reloading dashboard...")
-                st.experimental_rerun()
+    if df_raw is None:
+        st.error("Dataset not found at `data/raw/ai4i2020.csv`. Please ensure the dataset is committed to the repository.")
+        return
+
+    with st.spinner("Loading model (first run may take ~60 seconds to train)..."):
+        model_artifact, preprocessor = get_cached_model_and_preprocessor()
+
+    if model_artifact is None:
+        st.error("Model could not be loaded or trained. Check the logs for details.")
         return
 
     best_model = model_artifact["model"]
