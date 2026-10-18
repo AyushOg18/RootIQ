@@ -72,11 +72,20 @@ class RootIQShapExplainer:
             reverse=True
         )
 
+        # Extract scalar base_value safely across shap versions
+        if expected_val is not None:
+            if isinstance(expected_val, (list, np.ndarray)):
+                expected_scalar = float(np.ravel(expected_val)[0])
+            else:
+                expected_scalar = float(expected_val)
+        else:
+            expected_scalar = 0.0
+
         return {
             "method": "SHAP",
             "feature_attributions": attribution_dict,
             "sorted_attributions": sorted_attributions,
-            "base_value": float(expected_val) if expected_val is not None else 0.0,
+            "base_value": expected_scalar,
             "feature_names": self.feature_names,
             "raw_vector": sv
         }

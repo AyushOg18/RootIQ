@@ -73,10 +73,7 @@ def _train_pipeline_from_scratch():
 
     trainer = ModelTrainer(random_state=RANDOM_SEED)
     best_name = trainer.train_and_validate(X_train_s, y_train, X_val_s, y_val, selection_metric="f1")
-
-    test_results = {}
-    for name, model in trainer.models.items():
-        test_results[name] = evaluate_model(model, X_test_s, y_test)
+    test_results = trainer.evaluate_test_set(X_test_s, y_test.values if hasattr(y_test, "values") else y_test)
 
     trainer.save_best_model()
     preprocessor.save()
@@ -184,7 +181,7 @@ def main():
         )
 
         st.markdown("### Research Architecture & Methodology")
-        st.markdown("""
+        st.markdown(r"""
         1. **Verified Telemetry Dataset:** High-fidelity milling machine telemetry from UCI AI4I 2020 Predictive Maintenance dataset.
         2. **Physics-Informed Preprocessing:** Target leakage eliminated by removing deterministic failure flags (`TWF`, `HDF`, `PWF`, `OSF`, `RNF`) and identifiers (`UDI`, `Product ID`). Thermodynamic and mechanical power features engineered from first principles.
         3. **Class-Aware Predictive Modeling:** Candidate models (Random Forest, Gradient Boosting, HistGradientBoosting, Logistic Regression) optimized under severe class imbalance (3.4% failure rate).
@@ -238,6 +235,17 @@ def main():
         st.markdown("<p class='sub-header'>Evaluation across class-imbalance metrics on the held-out test set (15% split).</p>", unsafe_allow_html=True)
 
         # Performance table
+        if not test_results or model_name not in test_results:
+            # Fallback evaluate on test set if missing
+            X_test_scaled_path = DATA_PROCESSED_DIR / "X_test_scaled.npy"
+            y_test_path = DATA_PROCESSED_DIR / "y_test.csv"
+            if X_test_scaled_path.exists() and y_test_path.exists():
+                X_t = np.load(X_test_scaled_path)
+                y_t = pd.read_csv(y_test_path).iloc[:, 0].values
+                test_results = {model_name: evaluate_model(best_model, X_t, y_t)}
+            else:
+                test_results = {}
+
         rows = []
         for name, metrics in test_results.items():
             rows.append({
@@ -249,39 +257,43 @@ def main():
                 "ROC-AUC": f"{metrics['roc_auc']:.4f}",
                 "Balanced Accuracy": f"{metrics['balanced_accuracy']:.4f}"
             })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+        if rows:
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
         col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### Selected Model Confusion Matrix")
-            cm_dict = test_results[model_name]["confusion_matrix"]
-            fig, ax = plt.subplots(figsize=(5, 4), dpi=120)
-            cm = np.array([[cm_dict["tn"], cm_dict["fp"]], [cm_dict["fn"], cm_dict["tp"]]])
-            cax = ax.matshow(cm, cmap="Blues", alpha=0.85)
-            fig.colorbar(cax)
-            for i in range(2):
-                for j in range(2):
-                    ax.text(j, i, f"{cm[i, j]:,}", ha="center", va="center", color="white" if cm[i, j] > cm.max()/2 else "black", fontweight="bold")
-            ax.set_xticks([0, 1])
-            ax.set_yticks([0, 1])
-            ax.set_xticklabels(["Normal (0)", "Failure (1)"])
-            ax.set_yticklabels(["Normal (0)", "Failure (1)"])
-            ax.set_xlabel("Predicted")
-            ax.set_ylabel("True Ground Truth")
-            plt.tight_layout()
-            st.pyplot(fig)
+        target_metrics = test_results.get(model_name)
+        if target_metrics and "confusion_matrix" in target_metrics:
+            cm_dict = target_metrics["confusion_matrix"]
+            with col1:
+                st.markdown("#### Selected Model Confusion Matrix")
+                fig, ax = plt.subplots(figsize=(5, 4), dpi=120)
+                cm = np.array([[cm_dict["tn"], cm_dict["fp"]], [cm_dict["fn"], cm_dict["tp"]]])
+                cax = ax.matshow(cm, cmap="Blues", alpha=0.85)
+                fig.colorbar(cax)
+                for i in range(2):
+                    for j in range(2):
+                        ax.text(j, i, f"{cm[i, j]:,}", ha="center", va="center", color="white" if cm[i, j] > cm.max()/2 else "black", fontweight="bold")
+                ax.set_xticks([0, 1])
+                ax.set_yticks([0, 1])
+                ax.set_xticklabels(["Normal (0)", "Failure (1)"])
+                ax.set_yticklabels(["Normal (0)", "Failure (1)"])
+                ax.set_xlabel("Predicted")
+                ax.set_ylabel("True Ground Truth")
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close(fig)
 
-        with col2:
-            st.markdown("#### Operational Trade-Off Analysis")
-            fnr = test_results[model_name]["fnr"]
-            fpr = test_results[model_name]["fpr"]
-            st.markdown(f"""
-            - **Missed Failure Rate (FNR):** `{fnr:.2%}`  
-              *(Percentage of true machine failures that slipped past the model)*
-            - **False Alarm Rate (FPR):** `{fpr:.2%}`  
-              *(Percentage of normal cycles that triggered an unnecessary alert)*
-            - **Selection Justification:** `{model_name}` achieved optimal F1 balance on the validation set, preventing excessive false shutdowns while catching critical mechanical failure risks.
-            """)
+            with col2:
+                st.markdown("#### Operational Trade-Off Analysis")
+                fnr = target_metrics.get("fnr", 0.0)
+                fpr = target_metrics.get("fpr", 0.0)
+                st.markdown(f"""
+                - **Missed Failure Rate (FNR):** `{fnr:.2%}`  
+                  *(Percentage of true machine failures that slipped past the model)*
+                - **False Alarm Rate (FPR):** `{fpr:.2%}`  
+                  *(Percentage of normal cycles that triggered an unnecessary alert)*
+                - **Selection Justification:** `{model_name}` achieved optimal F1 balance on the validation set, preventing excessive false shutdowns while catching critical mechanical failure risks.
+                """)
 
     # -------------------------------------------------------------------------
     # PAGE 4: MACHINE OPERATIONAL SIMULATOR (input only)
