@@ -1,17 +1,22 @@
 """Root-level Streamlit entry point for cloud deployment (Streamlit Community Cloud).
 
-Streamlit Community Cloud looks for streamlit_app.py at the repo root by default.
-This file sets up sys.path and imports app.app — which auto-calls main() via its
-own _in_streamlit guard. Do NOT call main() here to avoid a double-call.
+Directly loads and executes app/app.py without relying on package imports.
 """
 
+import os
 import sys
 from pathlib import Path
+import runpy
 
-# Ensure project root and app/ dir are on sys.path
+# Ensure project root and app directory are on sys.path
 ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "app"))
+APP_DIR = ROOT / "app"
 
-# Importing app.app triggers its _in_streamlit guard which calls main() automatically
-import app.app  # noqa: F401, E402
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
+# Run app/app.py in the current namespace / as __main__
+app_file = APP_DIR / "app.py"
+runpy.run_path(str(app_file), run_name="__main__")
