@@ -85,7 +85,7 @@ The raw dataset contains 5 failure modes: **TWF** (Tool Wear), **HDF** (Heat Dis
 ### Setup Instructions
 ```bash
 # 1. Clone repository & navigate to workspace
-git clone https://github.com/Team-Diamonds/RootIQ.git
+git clone https://github.com/RootIQ.git
 cd RootIQ
 
 # 2. Install dependencies
